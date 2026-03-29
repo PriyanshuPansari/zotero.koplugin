@@ -534,11 +534,16 @@ function API.patchExistingMetadata()
     local patched = 0
 
     for key, item in pairs(items) do
-        if item.data ~= nil and item.data.itemType == "attachment"
+        if item.data ~= nil 
+            and item.data.itemType == "attachment"
+            and item.data.filename ~= nil
+            and item.data.filename ~= ""
             and table_contains(SUPPORTED_MEDIA_TYPES, item.data.contentType or "") then
 
-            local targetDir, targetPath = API.getDirAndPath(key)
-            if targetPath ~= nil and file_exists(targetPath) then
+            local ok, targetDir, targetPath = pcall(API.getDirAndPath, key)
+            if not ok or targetDir == nil or targetPath == nil then
+                print("Z: skipping " .. key .. " - could not get path")
+            elseif file_exists(targetPath) then
                 local parentKey = item.data.parentItem
                 if parentKey ~= nil and items[parentKey] ~= nil then
                     local parentItem = items[parentKey]
