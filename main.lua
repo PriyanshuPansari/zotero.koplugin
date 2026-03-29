@@ -261,12 +261,20 @@ function Plugin:addToMainMenu(menu_items)
                     {
                         text = _("Fix metadata for existing papers"),
                         callback = function()
-                            local count = ZoteroAPI.patchExistingMetadata()
-                            UIManager:show(InfoMessage:new{
-                                text = ("Patched metadata for %d papers."):format(count),
-                                timeout = 3,
-                                icon = "check"
-                            })
+                            local ok, result = pcall(ZoteroAPI.patchExistingMetadata)
+                            if ok then
+                                UIManager:show(InfoMessage:new{
+                                    text = ("Patched metadata for %d papers."):format(result),
+                                    timeout = 5,
+                                    icon = "check"
+                                })
+                            else
+                                UIManager:show(InfoMessage:new{
+                                    text = "Error: " .. tostring(result),
+                                    timeout = 10,
+                                    icon = "notice-warning"
+                                })
+                            end
                         end,
                     },
                 },
