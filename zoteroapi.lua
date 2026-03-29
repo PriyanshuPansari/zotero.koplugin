@@ -486,13 +486,79 @@ function API.downloadAndGetPath(key, download_callback)
     end
 
     local versionFile = io.open(targetDir .. "/version", "w")
-    if versionFile == nil then
-        return nil, "Could not write version file"
-    end
-    versionFile:write(tostring(attachment.version))
-    versionFile:close()
+        if versionFile == nil then
+            return nil, "Could not write version file"
+        end
+        versionFile:write(tostring(attachment.version))
+        versionFile:close()
 
-    return targetPath, nil
+        -- write proper metadata to KOReader sidecar so exporters get title/author
+        local items = API.getItems()
+        local parentKey = attachment.data.parentItem
+        if parentKey ~= nil and items[parentKey] ~= nil then
+            local parentItem = items[parentKey]
+            local doc_settings = DocSettings:open(targetPath)
+            local props = doc_settings:readSetting("doc_props") or {}
+
+            -- only fill in missing fields
+            if props.title == nil or props.title == "" then
+                props.title = parentItem.data.title or ""
+            end
+            if props.authors == nil or props.authors == "" then
+                props.authors = parentItem.meta.creatorSummary or ""
+            end
+            if props.description == nil or props.description == "" then
+                props.description = parentItem.data.abstractNote or ""
+            end
+            if props.keywords == nil or props.keywords == "" then
+                -- join tags into comma separated string
+                local tags = {}
+                if parentItem.data.tags then
+                    for _, tag in ipairs(parentItem.data.tags) do
+                        table.insert(tags, tag.tag)
+                    end
+                end
+                props.keywords = table.concat(tags, ", ")
+            end
+
+            doc_settings:saveSetting("doc_props", props)
+            doc_settings:flush()
+            print("Z: wrote doc_props for " .. (props.title or "unknown"))
+        end
+
+        return targetPath, nil
+end
+
+function API.patchExistingMetadata()
+    local items = API.getItems()
+    local patched = 0
+
+    for key, item in pairs(items) do
+        if item.data ~= nil and item.data.itemType == "attachment"
+            and table_contains(SUPPORTED_MEDIA_TYPES, item.data.contentType or "") then
+
+            local targetDir, targetPath = API.getDirAndPath(key)
+            if targetPath ~= nil and file_exists(targetPath) then
+                local parentKey = item.data.parentItem
+                if parentKey ~= nil and items[parentKey] ~= nil then
+                    local parentItem = items[parentKey]
+                    local doc_settings = DocSettings:open(targetPath)
+                    local props = doc_settings:readSetting("doc_props") or {}
+
+                    if props.title == nil or props.title == "" then
+                        props.title = parentItem.data.title or ""
+                        props.authors = parentItem.meta.creatorSummary or ""
+                        props.description = parentItem.data.abstractNote or ""
+                        doc_settings:saveSetting("doc_props", props)
+                        doc_settings:flush()
+                        patched = patched + 1
+                        print("Z: patched " .. (props.title or key))
+                    end
+                end
+            end
+        end
+    end
+    return patched
 end
 
 function API.downloadWebDAV(key, targetDir, targetPath)

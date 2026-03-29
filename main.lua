@@ -258,6 +258,17 @@ function Plugin:addToMainMenu(menu_items)
                             self:onZoteroSyncAction()
                         end,
                     },
+                    {
+                        text = _("Fix metadata for existing papers"),
+                        callback = function()
+                            local count = ZoteroAPI.patchExistingMetadata()
+                            UIManager:show(InfoMessage:new{
+                                text = ("Patched metadata for %d papers."):format(count),
+                                timeout = 3,
+                                icon = "check"
+                            })
+                        end,
+                    },
                 },
             },
             {
